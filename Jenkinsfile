@@ -3,9 +3,6 @@ pipeline {
     environment {
         DOCKER_HUB_CREDENTIALS = credentials('dockerhub-credentials')
         DOCKER_IMAGE = "pradyumnaragothaman/react-jenkins-docker-k8s"
-        CONTAINER_NAME = "react-app-container" // Custom name for your Docker container
-        APP_PORT = "3000" // Replace with the port your app uses
-        HOST_PORT = "3000" // Port to expose on the host machine
     }
     stages {
         stage('Checkout') {
@@ -13,9 +10,17 @@ pipeline {
                 git branch: 'main', url: 'https://github.com/pradyumnarago/react-jenkins-docker-k8s.git'
             }
         }
-        stage('Build Docker Image') {
+        stage('Build') {
             steps {
                 script {
+                    // Clean npm cache and remove node_modules and package-lock.json
+                    sh 'rm -rf package-lock.json node_modules'
+                    sh 'npm cache clean --force'
+                    
+                    // Install dependencies
+                    sh 'npm install'
+
+                    // Build the Docker image
                     docker.build(DOCKER_IMAGE)
                 }
             }
@@ -32,26 +37,10 @@ pipeline {
         stage('Deploy with Docker') {
             steps {
                 script {
-                    // Stop and remove any existing container with the same name
-                    sh """
-                    docker stop ${CONTAINER_NAME} || true
-                    docker rm ${CONTAINER_NAME} || true
-                    """
-
-                    // Run a new container with the latest image
-                    sh """
-                    docker run -d --name ${CONTAINER_NAME} -p ${HOST_PORT}:${APP_PORT} ${DOCKER_IMAGE}:latest
-                    """
+                    // Run Docker commands to deploy the application
+                    sh 'docker run -d -p 80:80 pradyumnaragothaman/react-jenkins-docker-k8s'
                 }
             }
-        }
-    }
-    post {
-        always {
-            echo 'Pipeline completed.'
-        }
-        failure {
-            echo 'Pipeline failed.'
         }
     }
 }
