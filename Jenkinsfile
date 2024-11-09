@@ -3,6 +3,9 @@ pipeline {
     environment {
         DOCKER_HUB_CREDENTIALS = credentials('dockerhub-credentials')
         DOCKER_IMAGE = "pradyumnaragothaman/react-jenkins-docker-k8s"
+        CONTAINER_NAME = "react-app-container" // Custom name for your Docker container
+        APP_PORT = "3000" // Replace with the port your app uses
+        HOST_PORT = "3000" // Port to expose on the host machine
     }
     stages {
         stage('Checkout') {
@@ -10,7 +13,7 @@ pipeline {
                 git branch: 'main', url: 'https://github.com/pradyumnarago/react-jenkins-docker-k8s.git'
             }
         }
-        stage('Build') {
+        stage('Build Docker Image') {
             steps {
                 script {
                     docker.build(DOCKER_IMAGE)
@@ -26,14 +29,29 @@ pipeline {
                 }
             }
         }
-        stage('Deploy to Kubernetes') {
+        stage('Deploy with Docker') {
             steps {
                 script {
-                    sh "kubectl apply -f ~/k8s-deployment/k8s-deployment.yaml"
-                    sh "kubectl apply -f ~/k8s-deployment/k8s-service.yaml"
+                    // Stop and remove any existing container with the same name
+                    sh """
+                    docker stop ${CONTAINER_NAME} || true
+                    docker rm ${CONTAINER_NAME} || true
+                    """
 
+                    // Run a new container with the latest image
+                    sh """
+                    docker run -d --name ${CONTAINER_NAME} -p ${HOST_PORT}:${APP_PORT} ${DOCKER_IMAGE}:latest
+                    """
                 }
             }
+        }
+    }
+    post {
+        always {
+            echo 'Pipeline completed.'
+        }
+        failure {
+            echo 'Pipeline failed.'
         }
     }
 }
